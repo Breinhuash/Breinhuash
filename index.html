@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Caja de Ritmos Infinita</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <h1>Caja de Ritmos Infinita</h1>
+      <p class="subtitle">
+        Genera ritmos, modula sonido, dispara pads y mezcla audio propio.
+      </p>
+
+      <section class="panel controls">
+        <button id="startAudio">Activar Audio</button>
+        <button id="playToggle">▶️ Iniciar</button>
+        <label>
+          BPM
+          <input id="bpm" type="range" min="60" max="180" value="110" />
+          <span id="bpmValue">110</span>
+        </label>
+        <label>
+          Swing
+          <input id="swing" type="range" min="0" max="0.45" step="0.01" value="0.12" />
+          <span id="swingValue">0.12</span>
+        </label>
+      </section>
+
+      <section class="panel synth">
+        <h2>Sintetizador modulable</h2>
+        <div class="grid2">
+          <label>
+            Volumen
+            <input id="masterVolume" type="range" min="0" max="1" step="0.01" value="0.7" />
+          </label>
+          <label>
+            Filtro (Hz)
+            <input id="filterFreq" type="range" min="100" max="8000" step="10" value="2200" />
+          </label>
+          <label>
+            Resonancia
+            <input id="filterQ" type="range" min="0" max="25" step="0.1" value="3" />
+          </label>
+          <label>
+            LFO velocidad
+            <input id="lfoRate" type="range" min="0.1" max="14" step="0.1" value="2.5" />
+          </label>
+          <label>
+            LFO profundidad
+            <input id="lfoDepth" type="range" min="0" max="2400" step="10" value="900" />
+          </label>
+          <label>
+            Reverb
+            <input id="reverbMix" type="range" min="0" max="1" step="0.01" value="0.28" />
+          </label>
+        </div>
+      </section>
+
+      <section class="panel pads">
+        <h2>Pads y activadores</h2>
+        <div id="padGrid" class="pad-grid"></div>
+      </section>
+
+      <section class="panel sequencer">
+        <div class="seq-header">
+          <h2>Secuenciador 16 pasos</h2>
+          <button id="randomize">🎲 Aleatorio</button>
+        </div>
+        <div id="sequencerGrid" class="seq-grid"></div>
+      </section>
+
+      <section class="panel media">
+        <h2>Audio externo</h2>
+        <div class="media-controls">
+          <label>
+            Subir archivo (mp3/wav)
+            <input id="uploadAudio" type="file" accept="audio/*" />
+          </label>
+          <label>
+            URL directa a audio
+            <input id="streamUrl" type="url" placeholder="https://ejemplo.com/audio.mp3" />
+          </label>
+          <button id="loadStream">Cargar URL</button>
+          <audio id="externalPlayer" controls></audio>
+        </div>
+        <p class="note">
+          Nota: YouTube y Spotify no permiten reproducir audio libremente desde un HTML simple
+          por licencias, CORS y políticas de API. Para eso haría falta una integración oficial.
+        </p>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
