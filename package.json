@@ -1,0 +1,9 @@
+{
+  "name": "caja-ritmos-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Demo HTML/CSS/JS de caja de ritmos con servidor estático para preview",
+  "scripts": {
+    "start": "node server.mjs"
+  }
+}
