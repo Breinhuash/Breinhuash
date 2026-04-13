@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Juego de Peleas</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111827;
+      --panel: #1f2937;
+      --p1: #22d3ee;
+      --p2: #f97316;
+      --text: #e5e7eb;
+      --damage: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #1e293b 0%, var(--bg) 60%);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+    }
+
+    .game {
+      width: min(960px, 100%);
+      background: linear-gradient(180deg, #111827 0%, #0b1220 100%);
+      border: 1px solid #374151;
+      border-radius: 18px;
+      padding: 1rem;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    }
+
+    .hud {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 0.8rem;
+    }
+
+    .health {
+      height: 24px;
+      background: #374151;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid #4b5563;
+    }
+
+    .health-bar {
+      height: 100%;
+      width: 100%;
+      transition: width 120ms linear;
+    }
+
+    .health-bar.p1 { background: linear-gradient(90deg, var(--p1), #3b82f6); }
+    .health-bar.p2 { background: linear-gradient(90deg, var(--p2), #ef4444); }
+
+    .timer {
+      min-width: 88px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.2rem;
+      background: var(--panel);
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 0.35rem 0.5rem;
+    }
+
+    canvas {
+      width: 100%;
+      display: block;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      background: linear-gradient(#1d4ed8 0%, #38bdf8 56%, #1e3a8a 56%, #0f172a 100%);
+    }
+
+    .controls {
+      margin-top: 0.8rem;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+      font-size: 0.9rem;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 0.7rem;
+      line-height: 1.5;
+    }
+
+    .result {
+      margin-top: 0.8rem;
+      text-align: center;
+      font-weight: 700;
+      min-height: 1.5rem;
+      color: #f8fafc;
+    }
+
+    .btn {
+      margin-top: 0.4rem;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: #f8fafc;
+      border-radius: 10px;
+      padding: 0.5rem 0.8rem;
+      cursor: pointer;
+    }
+
+    .btn:hover { border-color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <section class="hud">
+      <div class="health"><div id="p1Health" class="health-bar p1"></div></div>
+      <div id="timer" class="timer">60</div>
+      <div class="health"><div id="p2Health" class="health-bar p2"></div></div>
+    </section>
+
+    <canvas id="arena" width="900" height="420"></canvas>
+
+    <section class="controls">
+      <article class="card">
+        <strong>Jugador 1</strong><br>
+        Mover: <kbd>A</kbd>/<kbd>D</kbd> · Saltar: <kbd>W</kbd><br>
+        Golpe rápido: <kbd>F</kbd> · Golpe fuerte: <kbd>G</kbd>
+      </article>
+      <article class="card">
+        <strong>Jugador 2</strong><br>
+        Mover: <kbd>←</kbd>/<kbd>→</kbd> · Saltar: <kbd>↑</kbd><br>
+        Golpe rápido: <kbd>K</kbd> · Golpe fuerte: <kbd>L</kbd>
+      </article>
+    </section>
+
+    <div id="result" class="result"></div>
+    <button id="restart" class="btn" type="button">Reiniciar combate</button>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('arena');
+    const ctx = canvas.getContext('2d');
+    const p1HealthEl = document.getElementById('p1Health');
+    const p2HealthEl = document.getElementById('p2Health');
+    const timerEl = document.getElementById('timer');
+    const resultEl = document.getElementById('result');
+    const restartBtn = document.getElementById('restart');
+
+    const gravity = 0.7;
+    const floorY = canvas.height - 72;
+    const maxTime = 60;
+    let timer = maxTime;
+    let gameOver = false;
+    let timerTick = null;
+
+    const keys = {};
+
+    class Fighter {
+      constructor({ x, color, controls, facing }) {
+        this.x = x;
+        this.y = floorY;
+        this.vx = 0;
+        this.vy = 0;
+        this.width = 52;
+        this.height = 104;
+        this.color = color;
+        this.health = 100;
+        this.speed = 5;
+        this.jumpPower = 14;
+        this.controls = controls;
+        this.facing = facing;
+        this.attackCooldown = 0;
+        this.hitFlash = 0;
+      }
+
+      get attackRange() {
+        return {
+          x: this.x + (this.facing === 1 ? this.width : -50),
+          y: this.y + 26,
+          width: 50,
+          height: 32,
+        };
+      }
+
+      isOnGround() {
+        return this.y >= floorY;
+      }
+
+      jump() {
+        if (this.isOnGround()) this.vy = -this.jumpPower;
+      }
+
+      move() {
+        this.vx = 0;
+        if (keys[this.controls.left]) {
+          this.vx = -this.speed;
+          this.facing = -1;
+        }
+        if (keys[this.controls.right]) {
+          this.vx = this.speed;
+          this.facing = 1;
+        }
+      }
+
+      attack(power, opponent) {
+        if (this.attackCooldown > 0 || gameOver) return;
+
+        const range = this.attackRange;
+        const hit =
+          range.x < opponent.x + opponent.width &&
+          range.x + range.width > opponent.x &&
+          range.y < opponent.y + opponent.height &&
+          range.y + range.height > opponent.y;
+
+        this.attackCooldown = power === 8 ? 16 : 30;
+
+        if (hit) {
+          opponent.health = Math.max(0, opponent.health - power);
+          opponent.hitFlash = 6;
+          opponent.vx += this.facing * (power === 8 ? 2 : 4);
+          if (opponent.health === 0) {
+            endGame(this === player1 ? 'Jugador 1 gana por KO' : 'Jugador 2 gana por KO');
+          }
+        }
+      }
+
+      update() {
+        this.move();
+
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += gravity;
+
+        if (this.y > floorY) {
+          this.y = floorY;
+          this.vy = 0;
+        }
+
+        this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
+
+        if (this.attackCooldown > 0) this.attackCooldown -= 1;
+        if (this.hitFlash > 0) this.hitFlash -= 1;
+      }
+
+      draw() {
+        ctx.save();
+        ctx.fillStyle = this.hitFlash > 0 ? 'var(--damage)' : this.color;
+        ctx.fillRect(this.x, this.y - this.height, this.width, this.height);
+
+        const range = this.attackRange;
+        if (this.attackCooldown > 26 || this.attackCooldown > 12 && this.attackCooldown < 16) {
+          ctx.fillStyle = 'rgba(255,255,255,0.25)';
+          ctx.fillRect(range.x, range.y - this.height + 26, range.width, range.height);
+        }
+        ctx.restore();
+      }
+    }
+
+    const player1 = new Fighter({
+      x: 180,
+      color: '#22d3ee',
+      controls: { left: 'KeyA', right: 'KeyD', jump: 'KeyW', light: 'KeyF', heavy: 'KeyG' },
+      facing: 1,
+    });
+
+    const player2 = new Fighter({
+      x: 660,
+      color: '#f97316',
+      controls: { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', light: 'KeyK', heavy: 'KeyL' },
+      facing: -1,
+    });
+
+    function drawStage() {
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      for (let i = 0; i < canvas.width; i += 64) {
+        ctx.fillRect(i, floorY + 18, 34, 6);
+      }
+    }
+
+    function updateHUD() {
+      p1HealthEl.style.width = `${player1.health}%`;
+      p2HealthEl.style.width = `${player2.health}%`;
+      timerEl.textContent = String(timer);
+    }
+
+    function endGame(message) {
+      gameOver = true;
+      resultEl.textContent = message;
+      if (timerTick) clearInterval(timerTick);
+    }
+
+    function startTimer() {
+      if (timerTick) clearInterval(timerTick);
+      timer = maxTime;
+      timerTick = setInterval(() => {
+        if (gameOver) return;
+        timer -= 1;
+        timerEl.textContent = String(timer);
+        if (timer <= 0) {
+          const verdict = player1.health === player2.health
+            ? 'Empate por tiempo'
+            : player1.health > player2.health
+              ? 'Jugador 1 gana por puntos'
+              : 'Jugador 2 gana por puntos';
+          endGame(verdict);
+        }
+      }, 1000);
+    }
+
+    function resetGame() {
+      player1.x = 180;
+      player1.health = 100;
+      player1.vx = player1.vy = 0;
+      player1.facing = 1;
+      player1.attackCooldown = 0;
+
+      player2.x = 660;
+      player2.health = 100;
+      player2.vx = player2.vy = 0;
+      player2.facing = -1;
+      player2.attackCooldown = 0;
+
+      gameOver = false;
+      resultEl.textContent = '';
+      updateHUD();
+      startTimer();
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawStage();
+
+      if (!gameOver) {
+        player1.update();
+        player2.update();
+      }
+
+      player1.draw();
+      player2.draw();
+      updateHUD();
+      requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      if (gameOver) return;
+
+      if (e.code === player1.controls.jump) player1.jump();
+      if (e.code === player2.controls.jump) player2.jump();
+      if (e.code === player1.controls.light) player1.attack(8, player2);
+      if (e.code === player1.controls.heavy) player1.attack(14, player2);
+      if (e.code === player2.controls.light) player2.attack(8, player1);
+      if (e.code === player2.controls.heavy) player2.attack(14, player1);
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    restartBtn.addEventListener('click', resetGame);
+
+    resetGame();
+    animate();
+  </script>
+</body>
+</html>
